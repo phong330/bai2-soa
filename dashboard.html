@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ Thống SOA - Quản Lý Sản Phẩm & Đơn Hàng</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-network-wired text-amber-300"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">Hệ Thống SOA - Bài Thực Hành 4</h1>
+          <p class="text-xs text-indigo-200">Kiến trúc Microservices / SOA: Auth (3000) • Product (3001) • Order (3002)</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <div class="bg-indigo-800/80 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-indigo-500/30">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Auth: <b class="text-emerald-300">:3000</b></span>
+        </div>
+        <div class="bg-indigo-800/80 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-indigo-500/30">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Product: <b class="text-emerald-300">:3001</b></span>
+        </div>
+        <div class="bg-indigo-800/80 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-indigo-500/30">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Order: <b class="text-emerald-300">:3002</b></span>
+        </div>
+        <button onclick="refreshAll()" class="bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Banner -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 max-w-md p-4 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300"></div>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Top Alert info -->
+    <div class="bg-white border-l-4 border-indigo-600 p-4 rounded-r-xl shadow-sm flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-circle-check text-emerald-500"></i>
+          Hệ thống đang hoạt động với đầy đủ tính năng SOA
+        </h2>
+        <p class="text-xs text-slate-600 mt-1">
+          Đặt đơn hàng tại Order Service sẽ <b>tự động kiểm tra & trừ tồn kho</b> bên Product Service qua HTTP REST API. Hủy đơn sẽ <b>tự động hoàn lại số lượng tồn kho</b>.
+        </p>
+      </div>
+      <button onclick="autoFillTestOverStock()" class="text-xs bg-red-50 text-red-600 hover:bg-red-100 font-semibold px-3 py-2 rounded-lg border border-red-200 transition whitespace-nowrap">
+        <i class="fa-solid fa-bug"></i> Test thử đặt quá tồn kho (400)
+      </button>
+    </div>
+
+    <!-- 2 Column Layout: Product Service & Order Service -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- CỘT TRÁI: PRODUCT SERVICE (4 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div class="flex items-center gap-2.5">
+              <span class="p-2 bg-blue-100 text-blue-600 rounded-lg text-sm"><i class="fa-solid fa-box"></i></span>
+              <div>
+                <h3 class="font-bold text-slate-800 text-sm">Kho Sản Phẩm (Product Service)</h3>
+                <p class="text-[11px] text-slate-500">CSDL: ProductDB • Cổng 3001</p>
+              </div>
+            </div>
+            <span id="productCount" class="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-full border border-blue-200">0 sản phẩm</span>
+          </div>
+
+          <div class="p-4 max-h-[600px] overflow-y-auto divide-y divide-slate-100" id="productList">
+            <div class="text-center py-8 text-slate-400 text-xs">
+              <i class="fa-solid fa-spinner fa-spin text-xl text-indigo-500 mb-2"></i>
+              <p>Đang tải dữ liệu sản phẩm...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CỘT PHẢI: ORDER SERVICE (7 cols) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Form Tạo Đơn Hàng Mới -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="flex items-center gap-2.5 mb-4">
+            <span class="p-2 bg-emerald-100 text-emerald-600 rounded-lg text-sm"><i class="fa-solid fa-cart-plus"></i></span>
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Tạo Đơn Hàng Mới (Order Service)</h3>
+              <p class="text-[11px] text-slate-500">CSDL: OrderDB • Cổng 3002</p>
+            </div>
+          </div>
+
+          <form id="orderForm" onsubmit="createOrder(event)" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Tên khách hàng</label>
+                <input type="text" id="customerName" required placeholder="VD: Tran Van A"
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" value="Nguyen Van A">
+              </div>
+
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Chọn sản phẩm</label>
+                <select id="selectProduct" onchange="updateEstimatedPrice()"
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Đang tải...</option>
+                </select>
+              </div>
+
+              <div class="sm:col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Số lượng đặt</label>
+                <input type="number" id="orderQuantity" min="1" value="1" oninput="updateEstimatedPrice()"
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+              <div class="text-xs text-slate-500">
+                Tạm tính: <span id="estimatedPrice" class="font-bold text-indigo-700 text-sm">0 đ</span>
+              </div>
+              <button type="submit" id="btnSubmitOrder"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg text-sm transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i> Tạo Đơn Hàng
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Danh Sách Đơn Hàng -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div class="flex items-center gap-2.5">
+              <span class="p-2 bg-amber-100 text-amber-600 rounded-lg text-sm"><i class="fa-solid fa-clipboard-list"></i></span>
+              <div>
+                <h3 class="font-bold text-slate-800 text-sm">Danh Sách Đơn Hàng</h3>
+                <p class="text-[11px] text-slate-500">Đơn hàng được lưu tại OrderDB</p>
+              </div>
+            </div>
+            <span id="orderCount" class="text-xs bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full border border-amber-200">0 đơn</span>
+          </div>
+
+          <div class="p-4 max-h-[600px] overflow-y-auto space-y-3" id="orderList">
+            <div class="text-center py-8 text-slate-400 text-xs">
+              <i class="fa-solid fa-spinner fa-spin text-xl text-indigo-500 mb-2"></i>
+              <p>Đang tải dữ liệu đơn hàng...</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    const AUTH_URL = 'http://localhost:3000';
+    const PRODUCT_URL = 'http://localhost:3001';
+    const ORDER_URL = 'http://localhost:3002';
+
+    let token = '';
+    let productsCache = [];
+
+    // Format currency VND
+    function formatMoney(amount) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    // Toast alert
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = `fixed bottom-5 right-5 z-50 max-w-md p-4 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 flex items-center gap-3 ${
+        type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+      }`;
+      toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'} text-lg"></i> <span>${message}</span>`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    // Đăng nhập tự động lấy Token
+    async function login() {
+      try {
+        const res = await fetch(`${AUTH_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userName: 'admin', password: 'MTIzNDU2' }),
+        });
+        if (!res.ok) throw new Error('Không thể đăng nhập Auth Service');
+        const data = await res.json();
+        token = data.token;
+        return token;
+      } catch (err) {
+        showToast('Lỗi đăng nhập: ' + err.message, 'error');
+        return null;
+      }
+    }
+
+    // Lấy danh sách sản phẩm từ Product Service
+    async function loadProducts() {
+      try {
+        const res = await fetch(`${PRODUCT_URL}/products`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Không thể tải sản phẩm');
+        productsCache = await res.json();
+        renderProducts(productsCache);
+        renderProductSelect(productsCache);
+      } catch (err) {
+        document.getElementById('productList').innerHTML = `
+          <div class="text-center py-6 text-red-500 text-xs">
+            <i class="fa-solid fa-triangle-exclamation text-lg mb-1"></i>
+            <p>${err.message}</p>
+          </div>`;
+      }
+    }
+
+    // Render danh sách sản phẩm
+    function renderProducts(products) {
+      document.getElementById('productCount').innerText = `${products.length} sản phẩm`;
+      const container = document.getElementById('productList');
+      if (!products.length) {
+        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-4">Kho hàng trống</p>`;
+        return;
+      }
+
+      container.innerHTML = products.map(p => `
+        <div class="py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-800 truncate">${p.name}</span>
+              <span class="text-[10px] text-slate-400">#${p.id}</span>
+            </div>
+            <p class="text-xs font-semibold text-indigo-600 mt-0.5">${formatMoney(p.price)}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
+              p.quantity > 5 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+              p.quantity > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+              'bg-red-50 text-red-700 border border-red-200'
+            }">
+              Còn: ${p.quantity}
+            </span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render dropdown chọn sản phẩm
+    function renderProductSelect(products) {
+      const select = document.getElementById('selectProduct');
+      select.innerHTML = products.map(p => `
+        <option value="${p.id}" data-price="${p.price}" data-stock="${p.quantity}">
+          ${p.name} (Còn ${p.quantity} - ${formatMoney(p.price)})
+        </option>
+      `).join('');
+      updateEstimatedPrice();
+    }
+
+    // Tính giá tạm tính
+    function updateEstimatedPrice() {
+      const select = document.getElementById('selectProduct');
+      const qtyInput = document.getElementById('orderQuantity');
+      const opt = select.selectedOptions[0];
+      if (!opt) return;
+      const price = Number(opt.getAttribute('data-price') || 0);
+      const qty = Number(qtyInput.value || 1);
+      document.getElementById('estimatedPrice').innerText = formatMoney(price * qty);
+    }
+
+    // Lấy danh sách đơn hàng từ Order Service
+    async function loadOrders() {
+      try {
+        const res = await fetch(`${ORDER_URL}/orders`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Không thể tải đơn hàng');
+        const orders = await res.json();
+        renderOrders(orders);
+      } catch (err) {
+        document.getElementById('orderList').innerHTML = `
+          <div class="text-center py-6 text-red-500 text-xs">
+            <i class="fa-solid fa-triangle-exclamation text-lg mb-1"></i>
+            <p>${err.message}</p>
+          </div>`;
+      }
+    }
+
+    // Render danh sách đơn hàng
+    function renderOrders(orders) {
+      document.getElementById('orderCount').innerText = `${orders.length} đơn`;
+      const container = document.getElementById('orderList');
+      if (!orders.length) {
+        container.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">Chưa có đơn hàng nào</p>`;
+        return;
+      }
+
+      const statusBadges = {
+        PENDING: 'bg-amber-100 text-amber-800 border-amber-200',
+        CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
+        SHIPPED: 'bg-purple-100 text-purple-800 border-purple-200',
+        COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        CANCELLED: 'bg-rose-100 text-rose-800 border-rose-200',
+      };
+
+      container.innerHTML = orders.map(order => `
+        <div class="p-4 border border-slate-200 rounded-xl bg-white hover:border-indigo-300 transition shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-slate-900">Đơn hàng #${order.id}</span>
+              <span class="text-xs text-slate-500 ml-1">(${order.customerName})</span>
+            </div>
+            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusBadges[order.status] || 'bg-slate-100 text-slate-800'}">
+              ${order.status}
+            </span>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-2.5 text-xs space-y-1">
+            ${(order.items || []).map(item => `
+              <div class="flex items-center justify-between text-slate-600">
+                <span><b>${item.quantity}x</b> ${item.productName || 'Sản phẩm #' + item.productId}</span>
+                <span class="font-medium">${formatMoney(item.unitPrice * item.quantity)}</span>
+              </div>
+            `).join('')}
+            <div class="border-t border-slate-200 pt-1.5 flex items-center justify-between font-bold text-slate-800 text-xs">
+              <span>Tổng cộng:</span>
+              <span class="text-indigo-600">${formatMoney(order.totalAmount)}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-1.5 pt-1 text-xs">
+            ${order.status === 'PENDING' ? `
+              <button onclick="updateOrderStatus(${order.id}, 'CONFIRMED')" class="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold rounded-md border border-blue-200 transition">
+                <i class="fa-solid fa-check"></i> Xác nhận
+              </button>
+            ` : ''}
+
+            ${order.status !== 'CANCELLED' && order.status !== 'COMPLETED' ? `
+              <button onclick="updateOrderStatus(${order.id}, 'CANCELLED')" class="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 font-semibold rounded-md border border-rose-200 transition" title="Hủy đơn sẽ hoàn lại số lượng tồn kho">
+                <i class="fa-solid fa-ban"></i> Hủy (hoàn kho)
+              </button>
+            ` : ''}
+
+            <button onclick="deleteOrder(${order.id})" class="px-2.5 py-1 bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 font-semibold rounded-md transition" title="Xóa đơn hàng">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Tạo đơn hàng mới
+    async function createOrder(e) {
+      e.preventDefault();
+      const customerName = document.getElementById('customerName').value;
+      const productId = Number(document.getElementById('selectProduct').value);
+      const quantity = Number(document.getElementById('orderQuantity').value);
+
+      if (!productId || !quantity) {
+        showToast('Vui lòng chọn sản phẩm và số lượng', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmitOrder');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...`;
+
+      try {
+        const res = await fetch(`${ORDER_URL}/orders`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            customerName,
+            items: [{ productId, quantity }],
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Lỗi tạo đơn hàng');
+        }
+
+        showToast(`Tạo đơn #${data.id} thành công! Tồn kho đã tự động trừ.`, 'success');
+        refreshAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Tạo Đơn Hàng`;
+      }
+    }
+
+    // Cập nhật trạng thái đơn hàng
+    async function updateOrderStatus(orderId, status) {
+      try {
+        const res = await fetch(`${ORDER_URL}/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi cập nhật trạng thái');
+
+        showToast(`Đã chuyển đơn #${orderId} sang ${status}${status === 'CANCELLED' ? ' (Đã hoàn lại kho)' : ''}`);
+        refreshAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // Xóa đơn hàng
+    async function deleteOrder(orderId) {
+      if (!confirm(`Bạn có chắc muốn xóa đơn hàng #${orderId}?`)) return;
+      try {
+        const res = await fetch(`${ORDER_URL}/orders/${orderId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi xóa đơn hàng');
+        showToast(data.message || 'Xóa đơn hàng thành công');
+        refreshAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // Nút test đặt vượt tồn kho
+    function autoFillTestOverStock() {
+      document.getElementById('customerName').value = 'Khách Test Vượt Kho';
+      document.getElementById('orderQuantity').value = '9999';
+      updateEstimatedPrice();
+      showToast('Đã điền số lượng 9999. Hãy bấm "Tạo Đơn Hàng" để xem báo lỗi 400 chặn vượt kho!', 'error');
+    }
+
+    // Làm mới toàn bộ dữ liệu
+    async function refreshAll() {
+      if (!token) await login();
+      await Promise.all([loadProducts(), loadOrders()]);
+    }
+
+    // Khởi chạy khi mở trang
+    window.onload = async () => {
+      await refreshAll();
+    };
+  </script>
+</body>
+</html>

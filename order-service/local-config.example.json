@@ -1,0 +1,8 @@
+{
+  "host": "localhost",
+  "port": 1433,
+  "username": "sa",
+  "password": "your_password",
+  "database": "OrderDB"
+}
+
